@@ -15,6 +15,12 @@ public:
 		int mqttQuickUpdateInterval;
 		int mqttRegularUpdateInterval;
 
+		// HomeAssistant settings
+		String haDiscoveryTopic;
+		String haStateTopic;
+		String inverterName;
+		String unique_id;
+
 		//pvoutput settings
 		String pvoutputApiKey;
 		String pvoutputSystemId;

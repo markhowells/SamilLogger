@@ -48,7 +48,8 @@ void PVOutputPublisher::sendToPvOutput(SamilCommunicator::SamilInverterInformati
 {
 	//need to send out the data to pvouptut> use the avg values for pac, voltage and temp
 
-	http.begin("http://pvoutput.org/service/r2/addstatus.jsp"); //Specify request destination
+	WiFiClient client;
+	http.begin(client,"http://pvoutput.org/service/r2/addstatus.jsp"); //Specify request destination
 	http.addHeader("X-Pvoutput-Apikey", pvoutputSettings->pvoutputApiKey);
 	http.addHeader("X-Pvoutput-SystemId", pvoutputSettings->pvoutputSystemId);
 	http.addHeader("Content-Type", "application/x-www-form-urlencoded");

@@ -71,7 +71,7 @@ private:
 	SoftwareSerial * samilSerial;
 	SettingsManager * settingsManager;
 
-	char headerBuffer[7];
+	char headerBuffer[10];
 	char inputBuffer[BufferSize];
 	char outputBuffer[BufferSize];
 

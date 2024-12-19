@@ -11,7 +11,7 @@ void SamilCommunicator::start()
 {
 	auto settings = settingsManager->GetSettings();
 	//create the software serial on the custom pins so we can use the hardware serial for debug comms.
-	samilSerial = new SoftwareSerial(settings->RS485Rx, settings->RS485Tx, false, BufferSize); // (RX, TX. inverted, buffer)
+	samilSerial = new SoftwareSerial(settings->RS485Rx, settings->RS485Tx); // (RX, TX. inverted, buffer)
 	//start the software serial
 	samilSerial->begin(9600); //inverter fixed baud rate
 
@@ -195,13 +195,13 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 		Serial.print(". ");
 		debugPrintHex(0x55);
 		debugPrintHex(0xAA);
-		for (char cnt = 0; cnt < incomingDataLength; cnt++)
+		for (int8 cnt = 0; cnt < incomingDataLength; cnt++)
 			debugPrintHex(inputBuffer[cnt]);
 		Serial.println(".");
 	}
 
 	uint16_t crc = 0x55 + 0xAA;
-	for (char cnt = 0; cnt < incomingDataLength - 2; cnt++)
+	for (int8 cnt = 0; cnt < incomingDataLength - 2; cnt++)
 		crc += inputBuffer[cnt];
 
 	auto high = (crc >> 8) & 0xff;
@@ -319,7 +319,7 @@ void SamilCommunicator::handleIncomingInformation(char address, char dataLength,
 
 	//data from iniverter, means online
 	inverter->lastSeen = millis();
-	char dtPtr = 0;
+	int8 dtPtr = 0;
 	inverter->vpv1 = bytesToFloat(data, 10);					dtPtr += 2;
 	inverter->vpv2 = bytesToFloat(data+ dtPtr, 10);				dtPtr += 2;
 	inverter->ipv1 = bytesToFloat(data + dtPtr, 10);			dtPtr += 2;

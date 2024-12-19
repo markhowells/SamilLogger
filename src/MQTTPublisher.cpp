@@ -76,6 +76,7 @@ void MQTTPublisher::start()
 	}
 	Serial.println("MQTT enabled. Connecting.");
 	client.setServer(mqttSettings->mqttHostName.c_str(), mqttSettings->mqttPort);
+	client.setBufferSize(1024);
 	reconnect(); //connect right away
 	isStarted = true;
 }
@@ -177,8 +178,16 @@ void MQTTPublisher::handle()
 
 	bool MQTTPublisher::publishOnMQTT(String prepend, String topic, String value)
 	{
-		auto retVal =  client.publish((prepend.c_str() + topic).c_str(), value.c_str());
+		String fullTopic = (prepend.c_str() + topic).c_str();
+		
+		auto retVal =  this->publish(fullTopic, value);
+		return retVal;
+	}
+
+	bool MQTTPublisher::publish(String topic, String data) {
+		auto retVal =  client.publish(topic.c_str(), data.c_str());
 		yield();
 		return retVal;
+
 	}
 

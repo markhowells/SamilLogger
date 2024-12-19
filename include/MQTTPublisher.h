@@ -30,9 +30,10 @@ public:
 	MQTTPublisher(SettingsManager * settingsManager, SamilCommunicator *samiL, bool inDebugMode = false);
 	~MQTTPublisher();
 
+	bool publish(String topic, String data);
+
 	void start();
 	void stop();
 	
 	void handle();
 };
-

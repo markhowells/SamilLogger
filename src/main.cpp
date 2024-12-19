@@ -1,14 +1,19 @@
+#include <Arduino.h>
+
 
 #include <TimeLib.h>
 #include <NTPClient.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266WiFiMulti.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
+#include <WiFiClient.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include "SamilCommunicator.h"
 #include "SettingsManager.h"
 #include "MQTTPublisher.h"
+#include "HAPublisher.h"
 #include "PVOutputPublisher.h"
 #include "ESP8266mDNS.h"
 #include "Settings.h"			//change and then rename Settings.example.h to Settings.h to compile
@@ -17,11 +22,20 @@
 SettingsManager settingsManager;
 SamilCommunicator samilComms(&settingsManager, true);
 MQTTPublisher mqqtPublisher(&settingsManager, &samilComms, true);
+HAPublisher haPublisher(&settingsManager);
 PVOutputPublisher pvoutputPublisher(&settingsManager, &samilComms, true);
 WiFiUDP ntpUDP;
 
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 bool validTimeSet =false;
+
+String getMacAddress(void) {
+    uint8_t mac[6];
+	char macStr[13];
+    wifi_get_macaddr(STATION_IF, mac);
+    sprintf(macStr, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	return String (macStr);
+}
 
 void setup()
 {
@@ -43,10 +57,13 @@ void setup()
 	settings->timezone = TIMEZONE;
 	settings->RS485Rx = RS485_RX;
 	settings->RS485Tx = RS485_TX;
+	settings->haDiscoveryTopic = HA_DISCOVERY_TOPIC;
+	settings->inverterName = INVERTER_NAME;
+	settings->haStateTopic = HA_STATE_TOPIC;
 
 
 	//Init our compononents
-	Serial.begin(115200);
+	Serial.begin(9600);
 	Serial.println("Booting");
 	WiFi.mode(WIFI_STA);
 	WiFi.hostname(settings->wifiHostname.c_str());
@@ -62,7 +79,7 @@ void setup()
 
 	timeClient.begin();
 
-	ArduinoOTA.setHostname("SamilLogger");
+	ArduinoOTA.setHostname("settings->wifiHostname.c_str()");
 
 	ArduinoOTA.onStart([]() {
 		Serial.println("Start Ota");
@@ -86,9 +103,20 @@ void setup()
 	Serial.println("IP address: ");
 	Serial.println(WiFi.localIP());
 
+	String mac=getMacAddress();
+	settings->unique_id = mac;
+	
 	//ntp client
 	samilComms.start();
 	mqqtPublisher.start();
+
+	Serial.println("Registering MQTT device");
+	if (!haPublisher.HARegister(mqqtPublisher)) {
+		Serial.println("Failed to register device with MQTT server");
+	} else {
+		Serial.println("Device registered at HA MQTT");
+	}
+
 	validTimeSet = timeClient.update();
 	timeClient.setTimeOffset(settings->timezone * 60 * 60);
 }
@@ -122,3 +150,4 @@ void loop()
 	pvoutputPublisher.handle();
 	yield(); //prevent wathcdog timeout
 }
+

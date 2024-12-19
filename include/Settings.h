@@ -1,23 +1,32 @@
 //Hostname of ESP8266
-#define WIFI_HOSTNAME "GoodWeLogger"
+#define WIFI_HOSTNAME "SamilLogger-1"
+
+// InverterName
+#define INVERTER_NAME "House_PV_Inverter"
 
 //Wifi SSID to connect to
-#define WIFI_SSID "<your wifi ssid>"
+#define WIFI_SSID "Mulberry_IOT"
 
 //Passowrd for WIFI
-#define WIFI_PASSWORD "<your wifi pwd>"
+#define WIFI_PASSWORD "tUPjyANBsn2p"
+
+// Discovery topic for HomeAssistant
+#define HA_DISCOVERY_TOPIC "homeassistant/sensor"
+
+// State topic for values
+#define HA_STATE_TOPIC "home/inverters"
 
 //set the mqqt host name or ip address to your mqqt host. Leave empty to disable mqtt.
-#define MQTT_HOST_NAME  "192.168.2.2"
+#define MQTT_HOST_NAME  "192.168.1.174"
 
 //mqtt port for the above host
 #define MQTT_PORT       1883
 
 //if authentication is enabled for mqtt, set the username below. Leave empty to disable authentication
-#define MQTT_USER_NAME  "<mqtt user name>"
+#define MQTT_USER_NAME  "hass"
 
 //password for above user
-#define MQTT_PASSWORD   "<mqtt password>"
+#define MQTT_PASSWORD   "6WcEu&e3gmCKY3Dz"
 
 //update interval for fast changing values in milliseconds for mqtt
 #define MQTT_QUICK_UPDATE_INTERVAL  1000
@@ -26,10 +35,10 @@
 #define MQTT_REGULAR_UPDATE_INTERVAL  10000
 
 //set to your pvoutput api key (must have write rights). Leave empty to disable pvoutput publishing
-#define PVOUTPUT_API_KEY  "<your api key for pvoutput>"
+#define PVOUTPUT_API_KEY  ""
 
 //set to the pvoutput system id to update. Only the first inverter is supported for now
-#define PVOUTPUT_SYSTEM_ID  "<pvoutput system id>"
+#define PVOUTPUT_SYSTEM_ID  ""
 
 //how long between pvoutput updates. Pvoutput specifies a minimum of 5 minutes (5*60*1000)
 #define PVOUTPUT_UPDATE_INTERVAL   5 * 60 * 1000
