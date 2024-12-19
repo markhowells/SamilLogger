@@ -1,7 +1,9 @@
 # Samil SolarRiver Inverter Logger based on ESP8266
 
 This ESP8266 firmware enables you to read information from a Samil solar inverter through it's RS485 bus.
-Sending information to a MQTT broker is supported, as well as uploading information to [PVoutput](https://pvoutput.org/). This is a fork of https://github.com/jantenhove/GoodWeLogger
+Sending information to a MQTT broker is supported, as well as uploading information to [PVoutput](https://pvoutput.org/). This is a fork of https://github.com/vk2tds/SamilLogger. Notable changes include
+** Moved to Platformio
+** Added Home Assistant integration via MQTT
 
 ## Requirements
   - Samil inverter with RS485 connector
@@ -91,3 +93,5 @@ For the PVoutput upload function to work, it is important that the ESP8266 has a
 Apart from connections being made to PVoutput, you will also see that the ESP8266 talks with pool.ntp.org on a regular interval. This is done to retrieve the current time, which is needed to post data to PVoutput.
 
 If you plan to use only MQTT, internet access for the ESP8266 is not needed.
+
+## Home Assistant Integration
