@@ -17,7 +17,7 @@ public:
 
 		// HomeAssistant settings
 		String haDiscoveryTopic;
-		String haStateTopic;
+		String haStateTopicRoot;
 		String inverterName;
 		String unique_id;
 

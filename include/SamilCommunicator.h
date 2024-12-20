@@ -3,6 +3,7 @@
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 #include "SettingsManager.h"
+#include <MqttLogger.h>
 
 #define SAMIL_COMMS_ADDRES 0x00
 #define SAMIL_COMMS_ADDRESS 0x00
@@ -60,6 +61,7 @@ public:
 	void start();
 	void stop();
 	void handle();
+	void handle(MqttLogger logger);
 
 	std::vector<SamilInverterInformation> getInvertersInfo();
 	~SamilCommunicator();

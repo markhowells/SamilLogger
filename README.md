@@ -2,8 +2,8 @@
 
 This ESP8266 firmware enables you to read information from a Samil solar inverter through it's RS485 bus.
 Sending information to a MQTT broker is supported, as well as uploading information to [PVoutput](https://pvoutput.org/). This is a fork of https://github.com/vk2tds/SamilLogger. Notable changes include
-** Moved to Platformio
-** Added Home Assistant integration via MQTT
+  - Moved to Platformio
+  - Added Home Assistant integration via MQTT
 
 ## Requirements
   - Samil inverter with RS485 connector

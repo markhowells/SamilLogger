@@ -16,6 +16,7 @@
 #include "HAPublisher.h"
 #include "PVOutputPublisher.h"
 #include "ESP8266mDNS.h"
+#include <MqttLogger.h>
 #include "Settings.h"			//change and then rename Settings.example.h to Settings.h to compile
 
 
@@ -28,6 +29,7 @@ WiFiUDP ntpUDP;
 
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 bool validTimeSet =false;
+MqttLogger logger(mqqtPublisher.getClient(),"mqttlogger/log");
 
 String getMacAddress(void) {
     uint8_t mac[6];
@@ -59,7 +61,7 @@ void setup()
 	settings->RS485Tx = RS485_TX;
 	settings->haDiscoveryTopic = HA_DISCOVERY_TOPIC;
 	settings->inverterName = INVERTER_NAME;
-	settings->haStateTopic = HA_STATE_TOPIC;
+	settings->haStateTopicRoot = HA_STATE_TOPIC_ROOT;
 
 
 	//Init our compononents

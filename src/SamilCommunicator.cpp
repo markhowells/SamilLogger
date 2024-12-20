@@ -1,5 +1,5 @@
 #include "SamilCommunicator.h"
-
+MqttLogger log;
 
 SamilCommunicator::SamilCommunicator(SettingsManager * settingsMan, bool inDebug)
 {
@@ -38,9 +38,15 @@ void SamilCommunicator::stop()
 	inverters.clear();
 }
 
+void SamilCommunicator::handle(MqttLogger logger)
+{
+	log = logger;
+	handle();
+}
 
 int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char * data)
 {
+	log.write("Sending data to inverter(s): ");
 	if (debugMode)
 		Serial.write("Sending data to inverter(s): ");
 	//send the header first

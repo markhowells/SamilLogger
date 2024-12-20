@@ -2,6 +2,7 @@
 
 WiFiClient espClient;
 PubSubClient client(espClient);
+MqttLogger mqttLogger(client,"mqttlogger/log",MqttLoggerMode::MqttOnly);
 
 MQTTPublisher::MQTTPublisher(SettingsManager * settingsManager, SamilCommunicator * samiL, bool inDebugMode)
 {
@@ -176,7 +177,13 @@ void MQTTPublisher::handle()
 	}
 }
 
-	bool MQTTPublisher::publishOnMQTT(String prepend, String topic, String value)
+PubSubClient & MQTTPublisher::getClient()
+{
+    return client;
+}
+
+
+    bool MQTTPublisher::publishOnMQTT(String prepend, String topic, String value)
 	{
 		String fullTopic = (prepend.c_str() + topic).c_str();
 		

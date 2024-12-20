@@ -29,7 +29,7 @@ bool HAPublisher::HARegister(MQTTPublisher mqtt)
     discoverydoc["device_class"] = "power";
     discoverydoc["unit_of_measurement"]="Watts";
     discoverydoc["name"] = s->inverterName + " Power";
-    discoverydoc["state_topic"] = s->haStateTopic;
+    discoverydoc["state_topic"] = s->haStateTopicRoot+"/power";
     discoverydoc["unique_id"] = s->unique_id;
     discoverydoc["frc_upd"] = true;
     discoverydoc["val_tpl"] = "{{ value_json.power|default(100) }}";

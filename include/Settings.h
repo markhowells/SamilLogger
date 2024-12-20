@@ -14,7 +14,7 @@
 #define HA_DISCOVERY_TOPIC "homeassistant/sensor"
 
 // State topic for values
-#define HA_STATE_TOPIC "home/inverters"
+#define HA_STATE_TOPIC_ROOT "samil"
 
 //set the mqqt host name or ip address to your mqqt host. Leave empty to disable mqtt.
 #define MQTT_HOST_NAME  "192.168.1.174"
