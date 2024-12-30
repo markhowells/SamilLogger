@@ -234,8 +234,10 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 		LOGGER.println("CRC match.");
 	
 	//check the control code and function code to see what to do
-	if (inputBuffer[2] == 0x00 && inputBuffer[3] == 0x80)
-		handleRegistration(inputBuffer + 5, 16);
+	// if (inputBuffer[2] == 0x00 && inputBuffer[3] == 0x80)
+	//     handleRegistration(inputBuffer + 5, 16);
+	if (inputBuffer[4] == 0x00 && inputBuffer[5] == 0x80)
+		handleRegistration(inputBuffer + 7, 10);
 	else if (inputBuffer[2] == 0x00 && inputBuffer[3] == 0x81)
 		handleRegistrationConfirmation(inputBuffer[0]);
 	else if (inputBuffer[2] == 0x01 && inputBuffer[3] == 0x81)
@@ -244,7 +246,11 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 
 void SamilCommunicator::handleRegistration(char * serialNumber, char length)
 {
-	LOGGER.println("Handling Inverter Registration()...");
+	char buffer[32] = {char(0)};
+	if(debugMode) {
+	memcpy(buffer,serialNumber,length);
+	LOGGER.printf("Handling Inverter Registration(%s)...\n",buffer);
+	}
 	//check if the serialnumber isn't listed yet. If it is use that one
 	//Add the serialnumber, generate an address and send it to the inverter
 	if (length != 16)
