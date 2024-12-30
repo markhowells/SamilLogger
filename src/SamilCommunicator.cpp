@@ -1,10 +1,14 @@
 #include "SamilCommunicator.h"
-MqttLogger log;
+MqttLogger mqttlog;
+
+// #define LOGGER Serial
+#define LOGGER mqttlog
 
 SamilCommunicator::SamilCommunicator(SettingsManager * settingsMan, bool inDebug)
 {
 	settingsManager = settingsMan;
 	debugMode = inDebug;
+	debugMode = true;
 }
 
 void SamilCommunicator::start()
@@ -29,7 +33,7 @@ void SamilCommunicator::start()
 	//	delay(1);
 	//}
 
-	Serial.println("Samil Communicator started.");
+	LOGGER.println("Samil Communicator started.");
 }
 
 void SamilCommunicator::stop()
@@ -40,15 +44,14 @@ void SamilCommunicator::stop()
 
 void SamilCommunicator::handle(MqttLogger logger)
 {
-	log = logger;
+	mqttlog = logger;
 	handle();
 }
 
 int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char * data)
 {
-	log.write("Sending data to inverter(s): ");
 	if (debugMode)
-		Serial.write("Sending data to inverter(s): ");
+		LOGGER.write("Sending data to inverter(s): ");
 	//send the header first
   headerBuffer[4] = address >> 8;
   headerBuffer[5] = address & 0xFF;
@@ -78,14 +81,15 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	//write out the high and low
 	auto high = (crc >> 8) & 0xff;
 	auto low = crc & 0xff;
+	
 	samilSerial->write(high);
 	samilSerial->write(low);
 	if (debugMode)
 	{
-		Serial.print("CRC high/low: ");
+		LOGGER.print("CRC high/low: ");
 		debugPrintHex(high);
 		debugPrintHex(low);
-		Serial.println(".");
+		LOGGER.println(".");
 	}
 
 	return 9 + dataLength + 2; //header, data, crc
@@ -93,16 +97,16 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 
 void SamilCommunicator::debugPrintHex(char bt)
 {
-	Serial.print("0x");
-	Serial.print(bt, HEX);
-	Serial.print(" ");
+	LOGGER.print("0x");
+	LOGGER.print(bt, HEX);
+	LOGGER.print(" ");
 }
 
 void SamilCommunicator::sendDiscovery()
 {
 	//send out discovery for unregistered devices.
 	if(debugMode)
-		Serial.println("Sending discovery");
+		LOGGER.println("Sending discovery");
 	sendData(0x00, 0x00, 0x00, 0x00, nullptr);
 }
 
@@ -120,9 +124,9 @@ void SamilCommunicator::checkOfflineInverters()
 			{
 				if (debugMode)
 				{
-					Serial.print("Marking inverter @ address: ");
-					Serial.print((short)inverters[index].address);
-					Serial.println("offline.");
+					LOGGER.print("Marking inverter @ address: ");
+					LOGGER.print((short)inverters[index].address);
+					LOGGER.println("offline.");
 				}
 
 //				sendRemoveRegistration(inverters[index].address); //send in case the inverter thinks we are online
@@ -186,7 +190,7 @@ void SamilCommunicator::checkIncomingData()
 	{
 		//there is an open packet timeout. 
 		startPacketReceived = false; //wait for start packet again
-		Serial.println("Comms timeout.");
+		LOGGER.println("Comms timeout.");
 	}
 }
 void SamilCommunicator::parseIncomingData(char incomingDataLength) //
@@ -196,14 +200,14 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 	//incomingDataLength also has the crc data in it
 	if (debugMode)
 	{
-		Serial.print("Parsing incoming data with length: ");
+		LOGGER.print("Parsing incoming data with length: ");
 		debugPrintHex(incomingDataLength);
-		Serial.print(". ");
+		LOGGER.print(". ");
 		debugPrintHex(0x55);
 		debugPrintHex(0xAA);
 		for (int8 cnt = 0; cnt < incomingDataLength; cnt++)
 			debugPrintHex(inputBuffer[cnt]);
-		Serial.println(".");
+		LOGGER.println(".");
 	}
 
 	uint16_t crc = 0x55 + 0xAA;
@@ -215,19 +219,19 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 
 	if (debugMode)
 	{
-		Serial.print("CRC received: ");
+		LOGGER.print("CRC received: ");
 		debugPrintHex(inputBuffer[incomingDataLength - 2]);
 		debugPrintHex(inputBuffer[incomingDataLength - 1]);
-		Serial.print(", calculated CRC: ");
+		LOGGER.print(", calculated CRC: ");
 		debugPrintHex(high);
 		debugPrintHex(low);
-		Serial.println(".");
+		LOGGER.println(".");
 	}
 	//match the crc
 	if (!(high == inputBuffer[incomingDataLength - 2] && low == inputBuffer[incomingDataLength - 1]))
 		return;
 	if (debugMode)
-		Serial.println("CRC match.");
+		LOGGER.println("CRC match.");
 	
 	//check the control code and function code to see what to do
 	if (inputBuffer[2] == 0x00 && inputBuffer[3] == 0x80)
@@ -240,6 +244,7 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 
 void SamilCommunicator::handleRegistration(char * serialNumber, char length)
 {
+	LOGGER.println("Handling Inverter Registration()...");
 	//check if the serialnumber isn't listed yet. If it is use that one
 	//Add the serialnumber, generate an address and send it to the inverter
 	if (length != 16)
@@ -250,8 +255,8 @@ void SamilCommunicator::handleRegistration(char * serialNumber, char length)
 		//check inverter 
 		if (memcmp(inverters[index].serialNumber, serialNumber, 16) == 0)
 		{
-			Serial.print("Already registered inverter reregistered with address: ");
-			Serial.println((short)inverters[index].address);
+			LOGGER.print("Already registered inverter reregistered with address: ");
+			LOGGER.println((short)inverters[index].address);
 			//found it. Set to unconfirmed and send out the existing address to the inverter
 			inverters[index].addressConfirmed = false;
 			inverters[index].lastSeen = millis();
@@ -275,8 +280,8 @@ void SamilCommunicator::handleRegistration(char * serialNumber, char length)
 	inverters.push_back(newInverter);
 	if (debugMode)
 	{
-		Serial.print("New inverter found. Current # registrations: ");
-		Serial.println(inverters.size());
+		LOGGER.print("New inverter found. Current # registrations: ");
+		LOGGER.println(inverters.size());
 	}
 
 	sendAllocateRegisterAddress(serialNumber, lastUsedAddress);
@@ -286,15 +291,15 @@ void SamilCommunicator::handleRegistrationConfirmation(char address)
 {
 	if (debugMode)
 	{
-		Serial.print("Handling registration information for address: ");
-		Serial.println((short)address);
+		LOGGER.print("Handling registration information for address: ");
+		LOGGER.println((short)address);
 	}
 	//lookup the inverter and set it to confirmed
 	auto inverter = getInverterInfoByAddress(address);
 	if (inverter)
 	{
 		if (debugMode)
-			Serial.println("Inverter information found in list of inverters.");
+			LOGGER.println("Inverter information found in list of inverters.");
 		inverter->addressConfirmed = true;
 		inverter->isOnline = false; //inverter is online, but we first need to get its information
 		inverter->lastSeen = millis();
@@ -303,10 +308,10 @@ void SamilCommunicator::handleRegistrationConfirmation(char address)
 	{
 		if (debugMode)
 		{
-			Serial.print("Error. Could not find the inverter with address: ");
-			Serial.println((short)address);
-			Serial.print("Current # registrations: ");
-			Serial.println(inverters.size());
+			LOGGER.print("Error. Could not find the inverter with address: ");
+			LOGGER.println((short)address);
+			LOGGER.print("Current # registrations: ");
+			LOGGER.println(inverters.size());
 		}
 	}
 	//get the information straight away
@@ -373,13 +378,13 @@ void SamilCommunicator::askAllInvertersForInformation()
 		{
 			if (debugMode)
 			{
-				Serial.print("Not asking inverter with address: ");
-				Serial.print((short)inverters[index].address);
-				Serial.print(" for information. Addressconfirmed: ");
-				Serial.print((short)inverters[index].addressConfirmed);
-				Serial.print(", isOnline: ");
-				Serial.print((short)inverters[index].isOnline);
-				Serial.println(".");
+				LOGGER.print("Not asking inverter with address: ");
+				LOGGER.print((short)inverters[index].address);
+				LOGGER.print(" for information. Addressconfirmed: ");
+				LOGGER.print((short)inverters[index].addressConfirmed);
+				LOGGER.print(", isOnline: ");
+				LOGGER.print((short)inverters[index].isOnline);
+				LOGGER.println(".");
 			}
 		}
 	}
@@ -405,8 +410,8 @@ void SamilCommunicator::sendAllocateRegisterAddress(char * serialNumber, char ad
 {
 	if (debugMode)
 	{
-		Serial.print("SendAllocateRegisterAddress address: ");
-		Serial.println((short)address);
+		LOGGER.print("SendAllocateRegisterAddress address: ");
+		LOGGER.println((short)address);
 	}
 
 	//create our registrationpacket with serialnumber and address and send it over

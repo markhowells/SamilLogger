@@ -1,4 +1,6 @@
+#ifndef   MQTT_SOCKET_TIMEOUT
 #define MQTT_SOCKET_TIMEOUT 5
+#endif
 #pragma once
 #include <Arduino.h>
 #include <ESP8266WiFi.h>

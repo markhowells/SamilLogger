@@ -32,7 +32,7 @@
 #define MQTT_QUICK_UPDATE_INTERVAL  1000
 
 //update interval for slow changing values in milliseconds for mqtt
-#define MQTT_REGULAR_UPDATE_INTERVAL  10000
+#define MQTT_REGULAR_UPDATE_INTERVAL  120000
 
 //set to your pvoutput api key (must have write rights). Leave empty to disable pvoutput publishing
 #define PVOUTPUT_API_KEY  ""

@@ -111,6 +111,8 @@ void setup()
 	//ntp client
 	samilComms.start();
 	mqqtPublisher.start();
+logger.println("Hello World\n");
+
 
 	Serial.println("Registering MQTT device");
 	if (!haPublisher.HARegister(mqqtPublisher)) {
@@ -141,7 +143,7 @@ void loop()
 
 	ArduinoOTA.handle();
 	yield();
-	samilComms.handle();
+	samilComms.handle(logger);
 	yield();
 	mqqtPublisher.handle();
 	yield();
