@@ -9,7 +9,7 @@
 #define SAMIL_COMMS_ADDRESS 0x00
 #define PACKET_TIMEOUT 500			//0.5 sec packet timeout
 #define OFFLINE_TIMEOUT 30000		//30 seconds no data -> inverter offline
-#define DISCOVERY_INTERVAL 120000	//10 secs between discovery 
+#define DISCOVERY_INTERVAL 10000	//10 secs between discovery 
 #define INFO_INTERVAL 1000			//get inverter info every second
 
 class SamilCommunicator
@@ -58,6 +58,7 @@ public:
 	};
 
 	SamilCommunicator(SettingsManager * settingsManager, bool debugMode = false);
+	void start(MqttLogger logger);
 	void start();
 	void stop();
 	void handle();
@@ -85,6 +86,7 @@ private:
 	int curReceivePtr = 0;					//the ptr in our OutputBuffer when reading
 	int numToRead = 0;						//number of bytes to read after the header is read.
 
+	unsigned long lastResetSent = 0;
 	unsigned long lastDiscoverySent = 0;	//discovery needs to be sent every 10 secs. 
 	unsigned long lastInfoUpdateSent = 0;	//last info update sent to the registered inverters
 	char lastUsedAddress = 0;				//last used address counter. When overflows will only allocate not used
@@ -93,8 +95,8 @@ private:
 
 	int sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char * data);
 	void debugPrintHex(char cnt);
-	void sendDiscovery();
-	void checkOfflineInverters();
+    void sendDiscovery();
+    void checkOfflineInverters();
 	void checkIncomingData();
 	void parseIncomingData(char dataLength);
 	void handleRegistration(char * serialNumber, char length);
@@ -105,5 +107,5 @@ private:
 	void askInverterForInformation(char address);
 	SamilCommunicator::SamilInverterInformation * getInverterInfoByAddress(char address);
 	void sendAllocateRegisterAddress(char * serialNumber, char Address);
-	//void sendRemoveRegistration(char address);
+	void sendRemoveRegistration(char address);
 };

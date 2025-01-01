@@ -108,10 +108,11 @@ void setup()
 	String mac=getMacAddress();
 	settings->unique_id = mac;
 	
-	//ntp client
-	samilComms.start();
 	mqqtPublisher.start();
 logger.println("Hello World\n");
+
+	//ntp client
+	samilComms.start(logger);
 
 
 	Serial.println("Registering MQTT device");
@@ -143,7 +144,7 @@ void loop()
 
 	ArduinoOTA.handle();
 	yield();
-	samilComms.handle(logger);
+	samilComms.handle();
 	yield();
 	mqqtPublisher.handle();
 	yield();
