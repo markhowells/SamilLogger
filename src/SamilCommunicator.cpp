@@ -46,7 +46,7 @@ void SamilCommunicator::start()
 	headerBuffer[3] = SAMIL_COMMS_ADDRESS;
 
 	if (debugMode)
-	 	LOGGER.println("State 0: sendDiscovery: init Inverter");
+	 	LOGGER.println("State 0: sendDiscovery: init Inverters");
 	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
 
 	// remove all registered inverters. This is usefull when restarting the ESP. The inverter still thinks it is registered
@@ -490,7 +490,7 @@ void SamilCommunicator::sendRemoveRegistration(char address)
 	if (debugMode)
 		LOGGER.printf("sendRemoveRegistration (%d) ",address);
 	// send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
-	sendData(address, 0x00, 0x02, 0, nullptr);
+	sendData(address, 0x0, 0x02, 0, nullptr);
 }
 void SamilCommunicator::handle()
 {
@@ -505,13 +505,6 @@ void SamilCommunicator::handle()
 	{
 		sendDiscovery();
 		lastDiscoverySent = millis();
-	}
-
-	// reset every 20 secs.
-	if (millis() - lastResetSent >= 20000)
-	{
-		sendRemoveRegistration(1);
-		lastResetSent = millis();
 	}
 
 	// ask for info update every second
