@@ -45,13 +45,18 @@ void SamilCommunicator::start()
 	headerBuffer[2] = SAMIL_COMMS_ADDRES;
 	headerBuffer[3] = SAMIL_COMMS_ADDRESS;
 
+	if (debugMode)
+	 	LOGGER.println("State 0: sendDiscovery: init Inverter");
+	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
+
 	// remove all registered inverters. This is usefull when restarting the ESP. The inverter still thinks it is registered
 	// but this program does not know the address. The timeout is 10 minutes.
-	// for (char cnt = 1; cnt < 255; cnt++)
-	//{
-	//   sendRemoveRegistration(cnt);
-	//   delay(1);
-	// }
+	//  Should send 55aa000000000004000103
+	for (char cnt = 1; cnt < 255; cnt++)
+	{
+	  sendRemoveRegistration(cnt);
+	  delay(1);
+	}
 
 	LOGGER.println("Samil Communicator started.");
 }
@@ -118,11 +123,6 @@ void SamilCommunicator::debugPrintHex(char bt)
 void SamilCommunicator::sendDiscovery()
 {
 	// send out discovery for unregistered devices.
-	//  Should send 55aa000000000004000103
-	// if (debugMode)
-	// 	LOGGER.println("State 0: sendDiscovery: init Inverter");
-	// sendData(0x00, 0x00, 0x04, 0x00, nullptr);
-	// delay(100); // hack... Lets see if this works first...
 
 	if (debugMode)
 		LOGGER.print("State 1: sendDiscovery: ");
