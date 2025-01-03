@@ -16,8 +16,10 @@
 #include "HAPublisher.h"
 #include "PVOutputPublisher.h"
 #include "ESP8266mDNS.h"
-#include <MqttLogger.h>
 #include "Settings.h"			//change and then rename Settings.example.h to Settings.h to compile
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include "WebSerial.h"
 
 
 SettingsManager settingsManager;
@@ -29,7 +31,8 @@ WiFiUDP ntpUDP;
 
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 bool validTimeSet =false;
-MqttLogger logger(mqqtPublisher.getClient(),"mqttlogger/log");
+
+AsyncWebServer server(80);
 
 String getMacAddress(void) {
     uint8_t mac[6];
@@ -79,6 +82,35 @@ void setup()
 	Serial.println("");
 	Serial.println("Connected!");
 
+  // WebSerial is accessible at "<IP Address>/webserial" in browser
+  WebSerial.begin(&server);
+
+/* Attach Message Callback */
+  WebSerial.onMessage([&](uint8_t *data, size_t len) {
+    Serial.printf("Received %lu bytes from WebSerial: ", len);
+    Serial.write(data, len);
+    Serial.println();
+    WebSerial.println("Received Data...");
+    String d = "";
+    for(size_t i=0; i < len; i++){
+      d += char(data[i]);
+    }
+	if (strcmp("Reset",d.c_str())==0) {
+		samilComms.sendReset();
+	}
+	if (strcmp("Discover",d.c_str())==0) {
+		samilComms.sendDiscovery();
+	}
+	if (strcmp("Remove",d.c_str())==0) {
+		samilComms.sendRemoveRegistration(1);
+	}
+    WebSerial.println(d);
+  });
+
+WebSerial.println("Hello World\n");
+
+  server.begin();
+
 	timeClient.begin();
 
 	ArduinoOTA.setHostname("settings->wifiHostname.c_str()");
@@ -109,10 +141,9 @@ void setup()
 	settings->unique_id = mac;
 	
 	mqqtPublisher.start();
-logger.println("Hello World\n");
 
 	//ntp client
-	samilComms.start(logger);
+	samilComms.start();
 
 
 	Serial.println("Registering MQTT device");
@@ -141,6 +172,8 @@ void loop()
 		//sync time to time lib
 		setTime(timeClient.getEpochTime());
 	}
+
+	WebSerial.loop();
 
 	ArduinoOTA.handle();
 	yield();

@@ -9,7 +9,6 @@
 #include <vector>
 #include "PubSubClient.h"
 #include "WiFiClient.h"
-#include <MqttLogger.h>
 
 #define RECONNECT_TIMEOUT 15000
 

@@ -2,7 +2,6 @@
 
 WiFiClient espClient;
 PubSubClient client(espClient);
-MqttLogger mqttLogger(client,"mqttlogger/log",MqttLoggerMode::MqttOnly);
 
 MQTTPublisher::MQTTPublisher(SettingsManager * settingsManager, SamilCommunicator * samiL, bool inDebugMode)
 {

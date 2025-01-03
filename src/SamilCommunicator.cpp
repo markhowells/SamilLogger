@@ -13,10 +13,9 @@
 
 // Protocol http://www.radio-active.net.au/images/files/Samil%20Inverter.pdf
 
-MqttLogger mqttlog;
 
 // #define LOGGER Seria
-#define LOGGER mqttlog
+#define LOGGER WebSerial
 
 SamilCommunicator::SamilCommunicator(SettingsManager *settingsMan, bool inDebug)
 {
@@ -25,11 +24,6 @@ SamilCommunicator::SamilCommunicator(SettingsManager *settingsMan, bool inDebug)
 	debugMode = true;
 }
 
-void SamilCommunicator::start(MqttLogger logger)
-{
-	mqttlog = logger;
-	start();
-}
 
 void SamilCommunicator::start()
 {
@@ -52,11 +46,11 @@ void SamilCommunicator::start()
 	// remove all registered inverters. This is usefull when restarting the ESP. The inverter still thinks it is registered
 	// but this program does not know the address. The timeout is 10 minutes.
 	//  Should send 55aa000000000004000103
-	for (char cnt = 1; cnt < 255; cnt++)
-	{
-	  sendRemoveRegistration(cnt);
-	  delay(1);
-	}
+	// for (char cnt = 1; cnt < 255; cnt++)
+	// {
+	//   sendRemoveRegistration(cnt);
+	//   delay(1);
+	// }
 
 	LOGGER.println("Samil Communicator started.");
 }
@@ -70,7 +64,7 @@ void SamilCommunicator::stop()
 int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char *data)
 {
 	if (debugMode)
-		LOGGER.write("sendData: ");
+		LOGGER.print("sendData: ");
 	// send the header first
 	headerBuffer[4] = address >> 8;
 	headerBuffer[5] = address & 0xFF;
@@ -104,10 +98,10 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	samilSerial->write(low);
 	if (debugMode)
 	{
-		LOGGER.print("CRC high/low: ");
+		// LOGGER.print("CRC high/low: ");
 		debugPrintHex(high);
 		debugPrintHex(low);
-		LOGGER.println(".");
+		// LOGGER.println(".");
 	}
 
 	return 9 + dataLength + 2; // header, data, crc
@@ -115,9 +109,11 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 
 void SamilCommunicator::debugPrintHex(char bt)
 {
+	if (debugMode) {
 	LOGGER.print("0x");
 	LOGGER.print(bt, HEX);
 	LOGGER.print(" ");
+	}
 }
 
 void SamilCommunicator::sendDiscovery()
@@ -159,12 +155,13 @@ void SamilCommunicator::checkIncomingData()
 {
 	if (samilSerial->available())
 	{
+ LOGGER.printf("%d bytes to read ",samilSerial->available());
 		while (samilSerial->available() > 0)
 		{
 			byte incomingData = samilSerial->read();
-LOGGER.printf("Read byte ");
-debugPrintHex(incomingData);
-LOGGER.println(".");
+// LOGGER.printf("Read byte ");
+// debugPrintHex(incomingData);
+// LOGGER.println(".");
 
 			// wait for packet start. if found read until data length  + data.
 			// set the time we received the data so we can use some kind of timeout
@@ -368,7 +365,7 @@ void SamilCommunicator::handleRegistrationConfirmation(char address)
 void SamilCommunicator::handleIncomingInformation(char address, char dataLength, char *data)
 {
 	if (debugMode)
-		LOGGER.write("handleIncomingInformation ");
+		LOGGER.print("handleIncomingInformation ");
 	// need to parse the information and update our struct
 	// parse all pairs of two bytes and output them
 	auto inverter = getInverterInfoByAddress(address);
@@ -453,7 +450,7 @@ void SamilCommunicator::askAllInvertersForInformation()
 void SamilCommunicator::askInverterForInformation(char address)
 {
 	if (debugMode)
-		LOGGER.write("State 3: askInverterForInformation: ");
+		LOGGER.print("State 3: askInverterForInformation: ");
 	//  Pretty sure this is wrong for the inverter...
 	//  sendData(address, 0x01, 0x00, 0, nullptr);
 	sendData(address, 0x01, 0x02, 0, nullptr);
@@ -492,11 +489,19 @@ void SamilCommunicator::sendRemoveRegistration(char address)
 	// send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
 	sendData(address, 0x0, 0x02, 0, nullptr);
 }
+void SamilCommunicator::sendReset()
+{
+	if (debugMode)
+		LOGGER.println("sendReset()");
+	// send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
+	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
+}
 void SamilCommunicator::handle()
 {
 	// always check for incoming data
 	checkIncomingData();
 
+#ifdef NOTDEF
 	// check for offline inverters
 	checkOfflineInverters();
 
@@ -514,6 +519,7 @@ void SamilCommunicator::handle()
 		lastInfoUpdateSent = millis();
 	}
 	checkIncomingData();
+#endif
 }
 
 std::vector<SamilCommunicator::SamilInverterInformation> SamilCommunicator::getInvertersInfo()

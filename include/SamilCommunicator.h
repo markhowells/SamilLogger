@@ -3,7 +3,7 @@
 #include <SoftwareSerial.h>
 #include <ESP8266WiFi.h>
 #include "SettingsManager.h"
-#include <MqttLogger.h>
+#include "WebSerial.h"
 
 #define SAMIL_COMMS_ADDRES 0x00
 #define SAMIL_COMMS_ADDRESS 0x00
@@ -58,16 +58,14 @@ public:
 	};
 
 	SamilCommunicator(SettingsManager * settingsManager, bool debugMode = false);
-	void start(MqttLogger logger);
 	void start();
 	void stop();
 	void handle();
-	void handle(MqttLogger logger);
 
 	std::vector<SamilInverterInformation> getInvertersInfo();
 	~SamilCommunicator();
 
-private:
+// private:
 
 
 	static const int BufferSize = 96;	// largest packet is 67 bytes long. Extra for receiving with sliding window 
@@ -108,4 +106,5 @@ private:
 	SamilCommunicator::SamilInverterInformation * getInverterInfoByAddress(char address);
 	void sendAllocateRegisterAddress(char * serialNumber, char Address);
 	void sendRemoveRegistration(char address);
+	void sendReset();
 };
