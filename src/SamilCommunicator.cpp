@@ -94,8 +94,6 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	// write out the high and low
 	auto high = (crc >> 8) & 0xff;
 	auto low = crc & 0xff;
-	samilSerial->write(high);
-	samilSerial->write(low);
 	if (debugMode)
 	{
 		// LOGGER.print("CRC high/low: ");
@@ -103,6 +101,9 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 		debugPrintHex(low);
 		// LOGGER.println(".");
 	}
+	samilSerial->write(high);
+	samilSerial->write(low);
+
 
 	return 9 + dataLength + 2; // header, data, crc
 }
@@ -121,7 +122,7 @@ void SamilCommunicator::sendDiscovery()
 	// send out discovery for unregistered devices.
 
 	if (debugMode)
-		LOGGER.print("State 1: sendDiscovery: ");
+		LOGGER.print("sendDiscovery: ");
 	sendData(0x00, 0x00, 0x00, 0x00, nullptr);
 }
 
@@ -492,7 +493,7 @@ void SamilCommunicator::sendRemoveRegistration(char address)
 void SamilCommunicator::sendReset()
 {
 	if (debugMode)
-		LOGGER.println("sendReset()");
+		LOGGER.print ("sendReset(): ");
 	// send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
 	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
 }

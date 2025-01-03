@@ -90,11 +90,12 @@ void setup()
     Serial.printf("Received %lu bytes from WebSerial: ", len);
     Serial.write(data, len);
     Serial.println();
-    WebSerial.println("Received Data...");
     String d = "";
     for(size_t i=0; i < len; i++){
       d += char(data[i]);
     }
+    WebSerial.printf("Received Command... %s ",d.c_str());
+
 	if (strcmp("Reset",d.c_str())==0) {
 		samilComms.sendReset();
 	}
@@ -104,12 +105,9 @@ void setup()
 	if (strcmp("Remove",d.c_str())==0) {
 		samilComms.sendRemoveRegistration(1);
 	}
-    WebSerial.println(d);
   });
 
-WebSerial.println("Hello World\n");
-
-  server.begin();
+	  server.begin();
 
 	timeClient.begin();
 
@@ -174,6 +172,7 @@ void loop()
 	}
 
 	WebSerial.loop();
+	yield();
 
 	ArduinoOTA.handle();
 	yield();
