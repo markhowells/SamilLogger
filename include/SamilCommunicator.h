@@ -77,6 +77,9 @@ public:
 	char outputBuffer[BufferSize];
 
 	bool debugMode;
+	bool debugRead;
+	bool debugSend;
+	bool debugLogic;
 
 	unsigned long lastReceived = 0;			//timeout detection
 	bool startPacketReceived = false;		//start packet marker
@@ -93,6 +96,7 @@ public:
 
 	int sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char * data);
 	void debugPrintHex(char cnt);
+    char * debugPrintHex(char *buffer,char cnt);
     void sendDiscovery();
     void checkOfflineInverters();
 	void checkIncomingData();

@@ -105,6 +105,10 @@ void setup()
 	if (strcmp("Remove",d.c_str())==0) {
 		samilComms.sendRemoveRegistration(1);
 	}
+	if (strcmp("Request",d.c_str())==0) {
+		samilComms.askInverterForInformation(1);
+	}
+	
   });
 
 	  server.begin();

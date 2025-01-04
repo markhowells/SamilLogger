@@ -21,7 +21,10 @@ SamilCommunicator::SamilCommunicator(SettingsManager *settingsMan, bool inDebug)
 {
 	settingsManager = settingsMan;
 	debugMode = inDebug;
-	debugMode = true;
+	debugMode = false;
+	debugLogic = false;
+	debugRead = true;
+	debugSend = true;
 }
 
 
@@ -63,8 +66,12 @@ void SamilCommunicator::stop()
 
 int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char *data)
 {
-	if (debugMode)
-		LOGGER.print("sendData: ");
+	char dbgbuf[256]={0};
+	char hex[10]={0};
+
+	if (debugSend)
+		sprintf(dbgbuf,"%s",">> ");
+
 	// send the header first
 	headerBuffer[4] = address >> 8;
 	headerBuffer[5] = address & 0xFF;
@@ -79,33 +86,41 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	uint16_t crc = 0;
 	for (int cnt = 0; cnt < 9; cnt++)
 	{
-		if (debugMode)
-			debugPrintHex(headerBuffer[cnt]);
+		if (debugSend) {
+			strcat(dbgbuf,debugPrintHex(hex,headerBuffer[cnt]));
+		}
 		crc += headerBuffer[cnt];
 	}
 
 	for (int cnt = 0; cnt < dataLength; cnt++)
 	{
-		if (debugMode)
-			debugPrintHex(data[cnt]);
+		if (debugSend) {
+			strcat(dbgbuf,debugPrintHex(hex,data[cnt]));
+		}
 		crc += data[cnt];
 	}
 
 	// write out the high and low
 	auto high = (crc >> 8) & 0xff;
 	auto low = crc & 0xff;
-	if (debugMode)
+	if (debugSend)
 	{
 		// LOGGER.print("CRC high/low: ");
-		debugPrintHex(high);
-		debugPrintHex(low);
+		strcat(dbgbuf,debugPrintHex(hex,high));
+		strcat(dbgbuf,debugPrintHex(hex,low));
 		// LOGGER.println(".");
 	}
 	samilSerial->write(high);
 	samilSerial->write(low);
 
-
+	LOGGER.println(dbgbuf);
 	return 9 + dataLength + 2; // header, data, crc
+}
+
+char * SamilCommunicator::debugPrintHex(char *buffer,char bt)
+{
+	sprintf(buffer,"0x%02X ",bt);
+	return buffer;
 }
 
 void SamilCommunicator::debugPrintHex(char bt)
@@ -154,15 +169,19 @@ void SamilCommunicator::checkOfflineInverters()
 
 void SamilCommunicator::checkIncomingData()
 {
+	char dbgbuf[256]={0};
+	char hex[10]={0};
+
 	if (samilSerial->available())
 	{
- LOGGER.printf("%d bytes to read ",samilSerial->available());
+		if (debugRead)
+		sprintf(dbgbuf,"<< (%d) ",samilSerial->available());
 		while (samilSerial->available() > 0)
 		{
 			byte incomingData = samilSerial->read();
-// LOGGER.printf("Read byte ");
-// debugPrintHex(incomingData);
-// LOGGER.println(".");
+			if (debugRead) {
+				strcat(dbgbuf,debugPrintHex(hex,incomingData));
+			}
 
 			// wait for packet start. if found read until data length  + data.
 			// set the time we received the data so we can use some kind of timeout
@@ -194,12 +213,19 @@ void SamilCommunicator::checkIncomingData()
 					// got the complete packet
 					// parse it
 					startPacketReceived = false;
+					if (debugRead)
+						LOGGER.println(dbgbuf);
+					dbgbuf[0]=0;
 					parseIncomingData(curReceivePtr);
+
 				}
 			}
 			else if (!startPacketReceived)
 				lastReceivedByte = incomingData; // keep track of the last incoming byte so we detect the packet start
 		}
+
+		if (debugRead && strlen(dbgbuf))
+			LOGGER.println(dbgbuf);
 
 		lastReceived = millis();
 	}
@@ -495,6 +521,7 @@ void SamilCommunicator::sendReset()
 	if (debugMode)
 		LOGGER.print ("sendReset(): ");
 	// send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
+	sendData(0x01, 0x00, 0x02, 0x00, nullptr);
 	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
 }
 void SamilCommunicator::handle()
