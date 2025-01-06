@@ -11,10 +11,25 @@
 #define OFFLINE_TIMEOUT 30000		//30 seconds no data -> inverter offline
 #define DISCOVERY_INTERVAL 10000	//10 secs between discovery 
 #define INFO_INTERVAL 10000			//get inverter info every second
+#define SAMIL_BUFFERSIZE 96 // largest packet is 67 bytes long. Extra for receiving with sliding window 
+
+typedef struct _txPacket {
+	unsigned char delayedaddress;
+	unsigned char delayedcontrolcode;
+	unsigned char delayedfunctioncode;
+	unsigned char delayeddatalength;
+	char headerBuffer[10];
+	char outputBuffer[SAMIL_BUFFERSIZE];
+} TXPacket;
 
 class SamilCommunicator
 {
 public:
+		unsigned int lastrxtime = 0;
+		unsigned int txdelay = 0;
+
+		TXPacket txPacket;
+
 	struct SamilInverterInformation
 	{
 		char serialNumber[17];		//serial number (ascii) from inverter with zero appended
@@ -23,6 +38,7 @@ public:
 		unsigned long lastSeen;		//when was the inverter last seen? If not seen for 30 seconds the inverter is marked offline. 
 		bool isOnline;				//is the inverter online (see above)
 		bool isDTSeries;			//is tri phase inverter (get phase 2, 3 info)
+		bool delayedTX;
 
 		//inverert info from inverter pdf. Updated by the inverter info command
 		float vpv1=0.0;
@@ -68,13 +84,11 @@ public:
 // private:
 
 
-	static const int BufferSize = 96;	// largest packet is 67 bytes long. Extra for receiving with sliding window 
 	SoftwareSerial * samilSerial;
 	SettingsManager * settingsManager;
 
-	char headerBuffer[10];
-	char inputBuffer[BufferSize];
-	char outputBuffer[BufferSize];
+	char inputBuffer[SAMIL_BUFFERSIZE];
+	
 
 	bool debugMode;
 	bool debugRead;
@@ -94,7 +108,8 @@ public:
 
 	std::vector<SamilCommunicator::SamilInverterInformation> inverters;
 
-	int sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char * data);
+	int sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char * data, unsigned int rxDelay=0);
+	void doSend();
 	void debugPrintHex(char cnt);
     char * debugPrintHex(char *buffer,char cnt);
     void sendDiscovery();

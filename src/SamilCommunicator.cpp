@@ -37,10 +37,11 @@ void SamilCommunicator::start()
 	samilSerial->begin(9600); // inverter fixed baud rate
 
 	// set the fixed part of our buffer
-	headerBuffer[0] = 0x55;
-	headerBuffer[1] = 0xAA;
-	headerBuffer[2] = SAMIL_COMMS_ADDRES;
-	headerBuffer[3] = SAMIL_COMMS_ADDRESS;
+	
+	txPacket.headerBuffer[0] = 0x55;
+	txPacket.headerBuffer[1] = 0xAA;
+	txPacket.headerBuffer[2] = SAMIL_COMMS_ADDRES;
+	txPacket.headerBuffer[3] = SAMIL_COMMS_ADDRESS;
 
 	if (debugMode)
 	 	LOGGER.println("State 0: sendDiscovery: init Inverters");
@@ -64,57 +65,70 @@ void SamilCommunicator::stop()
 	inverters.clear();
 }
 
-int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char *data)
+int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char *data,unsigned int rxLag)
 {
 	char dbgbuf[256]={0};
 	char hex[10]={0};
 
-	if (debugSend)
-		sprintf(dbgbuf,"%s",">> ");
 
 	// send the header first
-	headerBuffer[4] = address >> 8;
-	headerBuffer[5] = address & 0xFF;
-	headerBuffer[6] = controlCode;
-	headerBuffer[7] = functionCode;
-	headerBuffer[8] = dataLength;
-	samilSerial->write(headerBuffer, 9);
-	// check if we need to write the data part and send it.
-	if (dataLength)
-		samilSerial->write(data, dataLength);
+	txPacket.headerBuffer[4] = address >> 8;
+	txPacket.headerBuffer[5] = address & 0xFF;
+	txPacket.headerBuffer[6] = controlCode;
+	txPacket.headerBuffer[7] = functionCode;
+	txPacket.headerBuffer[8] = dataLength;
+	txPacket.headerBuffer[9]=0;
+	
 	// need to send out the crc which is the addition of all previous values.
 	uint16_t crc = 0;
 	for (int cnt = 0; cnt < 9; cnt++)
 	{
-		if (debugSend) {
-			strcat(dbgbuf,debugPrintHex(hex,headerBuffer[cnt]));
-		}
-		crc += headerBuffer[cnt];
+		crc += txPacket.headerBuffer[cnt];
 	}
+	if(dataLength > 0)
+		memcpy(txPacket.outputBuffer,data,dataLength);
+	txPacket.outputBuffer[dataLength]=0;
+
+	// compute CRC
 
 	for (int cnt = 0; cnt < dataLength; cnt++)
 	{
-		if (debugSend) {
-			strcat(dbgbuf,debugPrintHex(hex,data[cnt]));
-		}
-		crc += data[cnt];
+		crc += txPacket.outputBuffer[cnt];
 	}
 
 	// write out the high and low
 	auto high = (crc >> 8) & 0xff;
 	auto low = crc & 0xff;
+
+	int _cnt = dataLength;
+	txPacket.outputBuffer[_cnt]=high;
+	txPacket.outputBuffer[_cnt+1]=low;
+	txPacket.outputBuffer[_cnt+2]=0;
 	if (debugSend)
 	{
-		// LOGGER.print("CRC high/low: ");
-		strcat(dbgbuf,debugPrintHex(hex,high));
-		strcat(dbgbuf,debugPrintHex(hex,low));
-		// LOGGER.println(".");
-	}
-	samilSerial->write(high);
-	samilSerial->write(low);
+		sprintf(dbgbuf,"Delay(%d)>> ",rxLag);
 
+		for(int i=0;i<=9;i++) {
+			strcat(dbgbuf,debugPrintHex(hex,txPacket.headerBuffer[i]));
+		}
+		for(int i=0;i<9;i++) {
+			strcat(dbgbuf,debugPrintHex(hex,txPacket.outputBuffer[i]));
+		}
+	}
+	if (rxLag==0) {
+		doSend();
+	} else {
+		txdelay = rxLag;
+	}
 	LOGGER.println(dbgbuf);
 	return 9 + dataLength + 2; // header, data, crc
+}
+
+void SamilCommunicator::doSend()
+{
+	samilSerial->write(txPacket.headerBuffer,9);
+	samilSerial->write(txPacket.outputBuffer);
+	txPacket.outputBuffer[0]=0;
 }
 
 char * SamilCommunicator::debugPrintHex(char *buffer,char bt)
@@ -179,6 +193,7 @@ void SamilCommunicator::checkIncomingData()
 		while (samilSerial->available() > 0)
 		{
 			byte incomingData = samilSerial->read();
+			lastrxtime = millis();
 			if (debugRead) {
 				strcat(dbgbuf,debugPrintHex(hex,incomingData));
 			}
@@ -506,7 +521,7 @@ void SamilCommunicator::sendAllocateRegisterAddress(char *serialNumber, char add
 	memcpy(RegisterData, serialNumber, 10);
 	RegisterData[10] = address;
 	// need to send alloc msg
-	sendData(0x00, 0x00, 0x01, 11, RegisterData);
+	sendData(0x00, 0x00, 0x01, 11, RegisterData,1000);
 }
 
 void SamilCommunicator::sendRemoveRegistration(char address)
@@ -524,10 +539,18 @@ void SamilCommunicator::sendReset()
 	sendData(0x01, 0x00, 0x02, 0x00, nullptr);
 	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
 }
+
 void SamilCommunicator::handle()
 {
 	// always check for incoming data
 	checkIncomingData();
+	if (txdelay > 0) {
+		LOGGER.println("Dealing with delayed send");
+		if (millis()>=(lastrxtime+txdelay) ) {
+			doSend();
+			txdelay=0;
+		}
+	}
 
 #ifdef NOTDEF
 	// check for offline inverters
