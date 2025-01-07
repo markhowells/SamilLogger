@@ -21,8 +21,8 @@ SamilCommunicator::SamilCommunicator(SettingsManager *settingsMan, bool inDebug)
 {
 	settingsManager = settingsMan;
 	debugMode = inDebug;
-	debugMode = false;
-	debugLogic = false;
+	debugMode = true;
+	debugLogic = true;
 	debugRead = true;
 	debugSend = true;
 }
@@ -65,7 +65,7 @@ void SamilCommunicator::stop()
 	inverters.clear();
 }
 
-int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, char *data,unsigned int rxLag)
+int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, const char *data,unsigned int rxLag)
 {
 	char dbgbuf[256]={0};
 	char hex[10]={0};
@@ -77,23 +77,27 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	txPacket.headerBuffer[6] = controlCode;
 	txPacket.headerBuffer[7] = functionCode;
 	txPacket.headerBuffer[8] = dataLength;
-	txPacket.headerBuffer[9]=0;
 	
 	// need to send out the crc which is the addition of all previous values.
 	uint16_t crc = 0;
-	for (int cnt = 0; cnt < 9; cnt++)
+	int cnt = 0;
+	for (cnt = 0; cnt < 9; cnt++)
 	{
 		crc += txPacket.headerBuffer[cnt];
 	}
-	if(dataLength > 0)
-		memcpy(txPacket.outputBuffer,data,dataLength);
-	txPacket.outputBuffer[dataLength]=0;
+	cnt=0;
+	while (cnt<dataLength) {
+		txPacket.outputBuffer[cnt]=data[cnt];
+		cnt++;
+	}
+	// if(dataLength > 0)
+	// 	memcpy(&(txPacket.outputBuffer),data,dataLength);
 
 	// compute CRC
 
-	for (int cnt = 0; cnt < dataLength; cnt++)
-	{
-		crc += txPacket.outputBuffer[cnt];
+	cnt = 0;
+	while( cnt < dataLength) 	{
+		crc += txPacket.outputBuffer[cnt++];
 	}
 
 	// write out the high and low
@@ -103,32 +107,51 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	int _cnt = dataLength;
 	txPacket.outputBuffer[_cnt]=high;
 	txPacket.outputBuffer[_cnt+1]=low;
-	txPacket.outputBuffer[_cnt+2]=0;
+	txPacket.datalength = dataLength;
+
 	if (debugSend)
 	{
 		sprintf(dbgbuf,"Delay(%d)>> ",rxLag);
 
-		for(int i=0;i<=9;i++) {
+		for(int i=0;i<9;i++) {
 			strcat(dbgbuf,debugPrintHex(hex,txPacket.headerBuffer[i]));
 		}
-		for(int i=0;i<9;i++) {
+		for(int i=0;i<dataLength+2;i++) {
 			strcat(dbgbuf,debugPrintHex(hex,txPacket.outputBuffer[i]));
 		}
 	}
+
+	LOGGER.println(dbgbuf);
+	dbgbuf[0]={0};
 	if (rxLag==0) {
 		doSend();
 	} else {
 		txdelay = rxLag;
 	}
-	LOGGER.println(dbgbuf);
+	
 	return 9 + dataLength + 2; // header, data, crc
 }
 
 void SamilCommunicator::doSend()
 {
+	char dbgbuf[1024]={0};
+	if (debugSend)
+	{
+		char hex[10];
+		sprintf(dbgbuf,"Actual>> ");
+
+		for(int i=0;i<9;i++) {
+			strcat(dbgbuf,debugPrintHex(hex,txPacket.headerBuffer[i]));
+		}
+		strcat(dbgbuf,":");
+		for(int i=0;i<txPacket.datalength+2;i++) {
+			strcat(dbgbuf,debugPrintHex(hex,txPacket.outputBuffer[i]));
+		}
+	}
+
+	LOGGER.printf("Write: %s DataLen: %d\n",dbgbuf,txPacket.datalength);
 	samilSerial->write(txPacket.headerBuffer,9);
-	samilSerial->write(txPacket.outputBuffer);
-	txPacket.outputBuffer[0]=0;
+	samilSerial->write(txPacket.outputBuffer,txPacket.datalength+2);
 }
 
 char * SamilCommunicator::debugPrintHex(char *buffer,char bt)
@@ -231,7 +254,11 @@ void SamilCommunicator::checkIncomingData()
 					if (debugRead)
 						LOGGER.println(dbgbuf);
 					dbgbuf[0]=0;
+					LOGGER.flush();
 					parseIncomingData(curReceivePtr);
+				curReceivePtr = 0;
+				numToRead = 0;
+				lastReceivedByte = 0x00; // reset last received for next packet
 
 				}
 			}
@@ -256,6 +283,7 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 	// first check the crc
 	// Data always start without the start bytes of 0x55 0xAA
 	// incomingDataLength also has the crc data in it
+	LOGGER.println("parseIncomingData: Parsing incoming data");
 	if (debugMode)
 	{
 		LOGGER.print("parseIncomingData: Parsing incoming data with length: ");
@@ -265,6 +293,7 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 		debugPrintHex(0xAA);
 		for (char cnt = 0; cnt < incomingDataLength; cnt++)
 			debugPrintHex(inputBuffer[cnt]);
+		LOGGER.flush();
 		LOGGER.println(".");
 	}
 
@@ -275,6 +304,7 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 	auto high = (crc >> 8) & 0xff;
 	auto low = crc & 0xff;
 
+#ifdef notdef
 	if (debugMode)
 	{
 		LOGGER.print("CRC received: ");
@@ -285,6 +315,7 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 		debugPrintHex(low);
 		LOGGER.println(".");
 	}
+#endif
 	// match the crc
 	if (!(high == inputBuffer[incomingDataLength - 2] && low == inputBuffer[incomingDataLength - 1]))
 		return;
@@ -307,11 +338,11 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 			LOGGER.println("Handle Registration.");
 		handleRegistration(inputBuffer + 7, inputBuffer[6]);
 	}
-	else if (inputBuffer[2] == 0x00 && inputBuffer[5] == 0x81)
+	else if (inputBuffer[4]==0 && inputBuffer[5] == 0x81)
 	{
 		if (debugMode)
 			LOGGER.println("Handle RegistrationConfirmation.");
-		handleRegistrationConfirmation(inputBuffer[0]);
+		handleRegistrationConfirmation(inputBuffer[1]);
 	}
 	else if (inputBuffer[2] == 0x01 && inputBuffer[3] == 0x81)
 	{
@@ -326,7 +357,8 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 
 void SamilCommunicator::handleRegistration(char *serialNumber, char length)
 {
-	// check if the serialnumber isn't listed yet. If it is use that one
+	LOGGER.flush();yield();
+		LOGGER.println("handleRegistration: ");	// check if the serialnumber isn't listed yet. If it is use that one
 	// Add the serialnumber, generate an address and send it to the inverter
 	if (debugMode)
 		LOGGER.println("handleRegistration: ");
@@ -375,6 +407,11 @@ void SamilCommunicator::handleRegistration(char *serialNumber, char length)
 
 void SamilCommunicator::handleRegistrationConfirmation(char address)
 {
+	char dbgbuf[256];
+	
+	sprintf(dbgbuf,"%s","Handle Reg for address %d\n",address);
+	LOGGER.println(dbgbuf);
+
 	if (debugMode)
 	{
 		LOGGER.print("handleRegistrationConfirmation: Handling registration information for address: ");
@@ -474,8 +511,7 @@ void SamilCommunicator::askAllInvertersForInformation()
 			askInverterForInformation(inverters[index].address);
 		else
 		{
-			// if (debugMode)
-			if (false)
+			if (debugMode)
 			{
 				LOGGER.print("Now asking inverter with address: ");
 				LOGGER.print((short)inverters[index].address);
@@ -545,10 +581,10 @@ void SamilCommunicator::handle()
 	// always check for incoming data
 	checkIncomingData();
 	if (txdelay > 0) {
-		LOGGER.println("Dealing with delayed send");
 		if (millis()>=(lastrxtime+txdelay) ) {
-			doSend();
+			LOGGER.println("Dealing with delayed send");
 			txdelay=0;
+			doSend();
 		}
 	}
 
@@ -566,11 +602,13 @@ void SamilCommunicator::handle()
 	// ask for info update every second
 	if (millis() - lastInfoUpdateSent >= 1000)
 	{
-		askAllInvertersForInformation();
+		LOGGER.println("Would normall ask inverters for info");
+		//askAllInvertersForInformation();
 		lastInfoUpdateSent = millis();
 	}
-	checkIncomingData();
 #endif
+
+	checkIncomingData();
 }
 
 std::vector<SamilCommunicator::SamilInverterInformation> SamilCommunicator::getInvertersInfo()
