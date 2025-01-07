@@ -23,6 +23,7 @@
 
 
 SettingsManager settingsManager;
+TXPacket txPacket;
 SamilCommunicator samilComms(&settingsManager, true);
 MQTTPublisher mqqtPublisher(&settingsManager, &samilComms, true);
 HAPublisher haPublisher(&settingsManager);
@@ -91,6 +92,7 @@ void setup()
     Serial.write(data, len);
     Serial.println();
     String d = "";
+	String mydata = "1234512345123451234512345";
     for(size_t i=0; i < len; i++){
       d += char(data[i]);
     }
@@ -107,6 +109,10 @@ void setup()
 	}
 	if (strcmp("Request",d.c_str())==0) {
 		samilComms.askInverterForInformation(1);
+	}
+	if (strcmp("Delay",d.c_str())==0) {
+		samilComms.sendData(0x00, 0x00, 0x00, 0x19, mydata.c_str(),0);
+		WebSerial.println("Called sendData ");
 	}
 	
   });
