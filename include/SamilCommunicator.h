@@ -14,19 +14,30 @@
 #define SAMIL_BUFFERSIZE 96 // largest packet is 67 bytes long. Extra for receiving with sliding window 
 
 typedef struct _txPacket {
-	unsigned char address;
-	unsigned char controlcode;
-	unsigned char functioncode;
+	unsigned int txdelay = 0;
+	bool active = false;
+	// unsigned char address;
+	// unsigned char controlcode;
+	// unsigned char functioncode;
 	unsigned char datalength;
 	char headerBuffer[10]={0};
 	char outputBuffer[SAMIL_BUFFERSIZE]={0};
 } TXPacket;
 
+typedef struct _rxPacket {
+	unsigned char source_address;
+	unsigned char control_code;
+	unsigned char op_code;
+	unsigned char crc_high;
+	unsigned char crc_low;
+	unsigned char datalength;
+	char payload[SAMIL_BUFFERSIZE]={0};
+} RXPacket;
+
 class SamilCommunicator
 {
 public:
 		unsigned int lastrxtime = 0;
-		unsigned int txdelay = 0;
 
 		TXPacket txPacket;
 
@@ -108,7 +119,7 @@ public:
 
 	std::vector<SamilCommunicator::SamilInverterInformation> inverters;
 
-	int sendData(unsigned int address, char controlCode, char functionCode, char dataLength, const char * data, unsigned int rxDelay=0);
+	int sendData(unsigned int address, char controlCode, char functionCode, char dataLength, const char * data, unsigned int rxDelay=2000);
 	void doSend();
 	void debugPrintHex(char cnt);
     char * debugPrintHex(char *buffer,char cnt);

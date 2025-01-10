@@ -13,8 +13,7 @@
 
 // Protocol http://www.radio-active.net.au/images/files/Samil%20Inverter.pdf
 
-
-// #define LOGGER Seria
+#define LOGGER Serial
 #define LOGGER WebSerial
 
 SamilCommunicator::SamilCommunicator(SettingsManager *settingsMan, bool inDebug)
@@ -27,7 +26,6 @@ SamilCommunicator::SamilCommunicator(SettingsManager *settingsMan, bool inDebug)
 	debugSend = true;
 }
 
-
 void SamilCommunicator::start()
 {
 	auto settings = settingsManager->GetSettings();
@@ -37,14 +35,15 @@ void SamilCommunicator::start()
 	samilSerial->begin(9600); // inverter fixed baud rate
 
 	// set the fixed part of our buffer
-	
+
+	txPacket.active = false;
 	txPacket.headerBuffer[0] = 0x55;
 	txPacket.headerBuffer[1] = 0xAA;
 	txPacket.headerBuffer[2] = SAMIL_COMMS_ADDRES;
 	txPacket.headerBuffer[3] = SAMIL_COMMS_ADDRESS;
 
 	if (debugMode)
-	 	LOGGER.println("State 0: sendDiscovery: init Inverters");
+		LOGGER.println("State 0: sendDiscovery: init Inverters");
 	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
 
 	// remove all registered inverters. This is usefull when restarting the ESP. The inverter still thinks it is registered
@@ -65,11 +64,13 @@ void SamilCommunicator::stop()
 	inverters.clear();
 }
 
-int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, const char *data,unsigned int rxLag)
+int SamilCommunicator::sendData(unsigned int address, char controlCode, char functionCode, char dataLength, const char *data, unsigned int rxLag)
 {
-	char dbgbuf[256]={0};
-	char hex[10]={0};
+	char dbgbuf[256] = {0};
+	char hex[10] = {0};
 
+	if (txPacket.active)
+		return 0;
 
 	// send the header first
 	txPacket.headerBuffer[4] = address >> 8;
@@ -77,7 +78,7 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	txPacket.headerBuffer[6] = controlCode;
 	txPacket.headerBuffer[7] = functionCode;
 	txPacket.headerBuffer[8] = dataLength;
-	
+
 	// need to send out the crc which is the addition of all previous values.
 	uint16_t crc = 0;
 	int cnt = 0;
@@ -85,9 +86,10 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	{
 		crc += txPacket.headerBuffer[cnt];
 	}
-	cnt=0;
-	while (cnt<dataLength) {
-		txPacket.outputBuffer[cnt]=data[cnt];
+	cnt = 0;
+	while (cnt < dataLength)
+	{
+		txPacket.outputBuffer[cnt] = data[cnt];
 		cnt++;
 	}
 	// if(dataLength > 0)
@@ -96,7 +98,8 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	// compute CRC
 
 	cnt = 0;
-	while( cnt < dataLength) 	{
+	while (cnt < dataLength)
+	{
 		crc += txPacket.outputBuffer[cnt++];
 	}
 
@@ -105,67 +108,76 @@ int SamilCommunicator::sendData(unsigned int address, char controlCode, char fun
 	auto low = crc & 0xff;
 
 	int _cnt = dataLength;
-	txPacket.outputBuffer[_cnt]=high;
-	txPacket.outputBuffer[_cnt+1]=low;
+	txPacket.outputBuffer[_cnt] = high;
+	txPacket.outputBuffer[_cnt + 1] = low;
 	txPacket.datalength = dataLength;
 
 	if (debugSend)
 	{
-		sprintf(dbgbuf,"Delay(%d)>> ",rxLag);
+		sprintf(dbgbuf, "Delay(%d)>> ", rxLag);
 
-		for(int i=0;i<9;i++) {
-			strcat(dbgbuf,debugPrintHex(hex,txPacket.headerBuffer[i]));
+		for (int i = 0; i < 9; i++)
+		{
+			strcat(dbgbuf, debugPrintHex(hex, txPacket.headerBuffer[i]));
 		}
-		for(int i=0;i<dataLength+2;i++) {
-			strcat(dbgbuf,debugPrintHex(hex,txPacket.outputBuffer[i]));
+		for (int i = 0; i < dataLength + 2; i++)
+		{
+			strcat(dbgbuf, debugPrintHex(hex, txPacket.outputBuffer[i]));
 		}
 	}
 
 	LOGGER.println(dbgbuf);
-	dbgbuf[0]={0};
-	if (rxLag==0) {
+	dbgbuf[0] = {0};
+	if (rxLag == 0)
+	{
 		doSend();
-	} else {
-		txdelay = rxLag;
 	}
-	
+	else
+	{
+		txPacket.txdelay = rxLag;
+		txPacket.active = true;
+	}
+
 	return 9 + dataLength + 2; // header, data, crc
 }
 
 void SamilCommunicator::doSend()
 {
-	char dbgbuf[1024]={0};
+	char dbgbuf[1024] = {0};
 	if (debugSend)
 	{
 		char hex[10];
-		sprintf(dbgbuf,"Actual>> ");
+		sprintf(dbgbuf, "Actual>> ");
 
-		for(int i=0;i<9;i++) {
-			strcat(dbgbuf,debugPrintHex(hex,txPacket.headerBuffer[i]));
+		for (int i = 0; i < 9; i++)
+		{
+			strcat(dbgbuf, debugPrintHex(hex, txPacket.headerBuffer[i]));
 		}
-		strcat(dbgbuf,":");
-		for(int i=0;i<txPacket.datalength+2;i++) {
-			strcat(dbgbuf,debugPrintHex(hex,txPacket.outputBuffer[i]));
+		strcat(dbgbuf, ":");
+		for (int i = 0; i < txPacket.datalength + 2; i++)
+		{
+			strcat(dbgbuf, debugPrintHex(hex, txPacket.outputBuffer[i]));
 		}
 	}
 
-	LOGGER.printf("Write: %s DataLen: %d\n",dbgbuf,txPacket.datalength);
-	samilSerial->write(txPacket.headerBuffer,9);
-	samilSerial->write(txPacket.outputBuffer,txPacket.datalength+2);
+	LOGGER.printf("Write: %s DataLen: %d\n", dbgbuf, txPacket.datalength);
+	samilSerial->write(txPacket.headerBuffer, 9);
+	samilSerial->write(txPacket.outputBuffer, txPacket.datalength + 2);
 }
 
-char * SamilCommunicator::debugPrintHex(char *buffer,char bt)
+char *SamilCommunicator::debugPrintHex(char *buffer, char bt)
 {
-	sprintf(buffer,"0x%02X ",bt);
+	sprintf(buffer, "0x%02X ", bt);
 	return buffer;
 }
 
 void SamilCommunicator::debugPrintHex(char bt)
 {
-	if (debugMode) {
-	LOGGER.print("0x");
-	LOGGER.print(bt, HEX);
-	LOGGER.print(" ");
+	if (debugMode)
+	{
+		LOGGER.print("0x");
+		LOGGER.print(bt, HEX);
+		LOGGER.print(" ");
 	}
 }
 
@@ -175,11 +187,12 @@ void SamilCommunicator::sendDiscovery()
 
 	if (debugMode)
 		LOGGER.print("sendDiscovery: ");
-	sendData(0x00, 0x00, 0x00, 0x00, nullptr);
+	sendData(0x00, 0x00, 0x00, 0x00, nullptr, 0);
 }
 
 void SamilCommunicator::checkOfflineInverters()
 {
+#define LOGGER WebSerial
 	// check inverter timeout
 	for (char index = 0; index < inverters.size(); ++index)
 	{
@@ -202,23 +215,25 @@ void SamilCommunicator::checkOfflineInverters()
 			inverters[index].isOnline = newOnline;
 		}
 	}
+#define LOGGER Serial
 }
 
 void SamilCommunicator::checkIncomingData()
 {
-	char dbgbuf[256]={0};
-	char hex[10]={0};
+	char dbgbuf[256] = {0};
+	char hex[10] = {0};
 
 	if (samilSerial->available())
 	{
 		if (debugRead)
-		sprintf(dbgbuf,"<< (%d) ",samilSerial->available());
+			sprintf(dbgbuf, "<< (%d) ", samilSerial->available());
 		while (samilSerial->available() > 0)
 		{
 			byte incomingData = samilSerial->read();
 			lastrxtime = millis();
-			if (debugRead) {
-				strcat(dbgbuf,debugPrintHex(hex,incomingData));
+			if (debugRead)
+			{
+				strcat(dbgbuf, debugPrintHex(hex, incomingData));
 			}
 
 			// wait for packet start. if found read until data length  + data.
@@ -253,13 +268,12 @@ void SamilCommunicator::checkIncomingData()
 					startPacketReceived = false;
 					if (debugRead)
 						LOGGER.println(dbgbuf);
-					dbgbuf[0]=0;
+					dbgbuf[0] = 0;
 					LOGGER.flush();
 					parseIncomingData(curReceivePtr);
-				curReceivePtr = 0;
-				numToRead = 0;
-				lastReceivedByte = 0x00; // reset last received for next packet
-
+					curReceivePtr = 0;
+					numToRead = 0;
+					lastReceivedByte = 0x00; // reset last received for next packet
 				}
 			}
 			else if (!startPacketReceived)
@@ -280,6 +294,9 @@ void SamilCommunicator::checkIncomingData()
 }
 void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 {
+#define LOGGER WebSerial
+	RXPacket rxPacket;
+
 	// first check the crc
 	// Data always start without the start bytes of 0x55 0xAA
 	// incomingDataLength also has the crc data in it
@@ -322,43 +339,49 @@ void SamilCommunicator::parseIncomingData(char incomingDataLength) //
 	if (debugMode)
 		LOGGER.println("CRC match.");
 
-	// Sending data to inverter(s): 0x55 0xAA 0x0 0x0 0x0 0x0 0x0 0x0 0x0 CRC high/low: 0x0 0xFF .
-	//                                                      0    1   2   3   4   5   6   7    8   9   10    11   12   13   14   15   16  17    18
-	// Parsing incoming data with length: 0x13 . 0x55 0xAA 0x0 0x0 0x0 0x0 0x0 0x80 0xA 0x53 0x32 0x32 0x31 0x31 0x35 0x31 0x34 0x31 0x35 0x3 0xA2 .
-	// CRC received: 0x3 0xA2 , calculated CRC: 0x3 0xA2 .
-	// CRC match.
+	rxPacket.control_code = inputBuffer[4];
+	rxPacket.op_code = inputBuffer[5];
+	rxPacket.source_address = inputBuffer[1];
+	rxPacket.datalength = inputBuffer[6];
+	memcpy(rxPacket.payload,inputBuffer+7,rxPacket.datalength);
+	rxPacket.crc_high = high;
+	rxPacket.crc_low = low;
+
 
 	// check the control code and function code to see what to do
-	if (
-		inputBuffer[2] == 0x00 && inputBuffer[3] == 0x00 &&
-		inputBuffer[4] == 0x00 &&
-		inputBuffer[5] == 0x80)
+	if (rxPacket.control_code==0 && rxPacket.op_code==0x80)
+		// inputBuffer[2] == 0x00 && inputBuffer[3] == 0x00 &&
+		// inputBuffer[4] == 0x00 &&
+		// inputBuffer[5] == 0x80)
 	{
 		if (debugMode)
-			LOGGER.println("Handle Registration.");
-		handleRegistration(inputBuffer + 7, inputBuffer[6]);
+			LOGGER.println("Handle Registration...");
+		handleRegistration(rxPacket.payload, rxPacket.datalength);
 	}
-	else if (inputBuffer[4]==0 && inputBuffer[5] == 0x81)
+	else if (rxPacket.control_code == 0 && rxPacket.op_code == 0x81)
 	{
 		if (debugMode)
-			LOGGER.println("Handle RegistrationConfirmation.");
-		handleRegistrationConfirmation(inputBuffer[1]);
+			LOGGER.println("Handle RegistrationConfirmation...");
+		handleRegistrationConfirmation(rxPacket.source_address);
 	}
-	else if (inputBuffer[2] == 0x01 && inputBuffer[3] == 0x81)
+	else if (rxPacket.control_code == 0x01 && rxPacket.op_code == 0x82)
 	{
 		if (debugMode)
-			LOGGER.println("Handle Information.");
-		handleIncomingInformation(inputBuffer[0], inputBuffer[4], inputBuffer + 5);
+			LOGGER.println("Handle Information...");
+		handleIncomingInformation(rxPacket.source_address, rxPacket.datalength, rxPacket.payload);
 	}
-	else {
+	else
+	{
 		LOGGER.println("Unknown packet");
 	}
+#define LOGGER Serial
 }
 
 void SamilCommunicator::handleRegistration(char *serialNumber, char length)
 {
-	LOGGER.flush();yield();
-		LOGGER.println("handleRegistration: ");	// check if the serialnumber isn't listed yet. If it is use that one
+	LOGGER.flush();
+	yield();
+	LOGGER.println("handleRegistration: "); // check if the serialnumber isn't listed yet. If it is use that one
 	// Add the serialnumber, generate an address and send it to the inverter
 	if (debugMode)
 		LOGGER.println("handleRegistration: ");
@@ -408,8 +431,8 @@ void SamilCommunicator::handleRegistration(char *serialNumber, char length)
 void SamilCommunicator::handleRegistrationConfirmation(char address)
 {
 	char dbgbuf[256];
-	
-	sprintf(dbgbuf,"%s","Handle Reg for address %d\n",address);
+
+	sprintf(dbgbuf, "%s", "Handle Reg for address %d\n", address);
 	LOGGER.println(dbgbuf);
 
 	if (debugMode)
@@ -424,6 +447,7 @@ void SamilCommunicator::handleRegistrationConfirmation(char address)
 		if (debugMode)
 			LOGGER.println("Inverter information found in list of inverters.");
 		inverter->addressConfirmed = true;
+		WebSerial.printf("Markhing inverter %d OFFLINE",address);
 		inverter->isOnline = false; // inverter is online, but we first need to get its information
 		inverter->lastSeen = millis();
 	}
@@ -443,15 +467,16 @@ void SamilCommunicator::handleRegistrationConfirmation(char address)
 
 void SamilCommunicator::handleIncomingInformation(char address, char dataLength, char *data)
 {
+	WebSerial.printf("handleIncomingInformation (%d) for %d\n",dataLength,address);
 	if (debugMode)
-		LOGGER.print("handleIncomingInformation ");
+		LOGGER.printf("handleIncomingInformation for %d",address);
 	// need to parse the information and update our struct
 	// parse all pairs of two bytes and output them
 	auto inverter = getInverterInfoByAddress(address);
 	if (inverter == nullptr)
 		return;
 
-	if (dataLength < 44) // minimum for non dt series
+	if (dataLength < 40) // minimum for non dt series
 		return;
 
 	// data from inverter, means online
@@ -494,6 +519,7 @@ void SamilCommunicator::handleIncomingInformation(char address, char dataLength,
 	inverter->temp = bytesToFloat(data + dtPtr, 10); // dtPtr += inverter->isDTSeries ? 34 : 26;
 	inverter->eDay = bytesToFloat(data + dtPtr, 10);
 	// isonline is set after first batch of data is set so readers get actual data
+	WebSerial.printf("Marking inverter %d online\n",address);
 	inverter->isOnline = true;
 }
 
@@ -549,7 +575,7 @@ void SamilCommunicator::sendAllocateRegisterAddress(char *serialNumber, char add
 {
 	if (debugMode)
 	{
-		LOGGER.printf("State 2: SendAllocateRegisterAddress: address: %d",(short)address);
+		LOGGER.printf("State 2: SendAllocateRegisterAddress: address: %d", (short)address);
 	}
 
 	// create our registrationpacket with serialnumber and address and send it over
@@ -557,40 +583,43 @@ void SamilCommunicator::sendAllocateRegisterAddress(char *serialNumber, char add
 	memcpy(RegisterData, serialNumber, 10);
 	RegisterData[10] = address;
 	// need to send alloc msg
-	sendData(0x00, 0x00, 0x01, 11, RegisterData,1000);
+	sendData(0x00, 0x00, 0x01, 11, RegisterData, 1000);
 }
 
 void SamilCommunicator::sendRemoveRegistration(char address)
 {
 	if (debugMode)
-		LOGGER.printf("sendRemoveRegistration (%d) ",address);
+		LOGGER.printf("sendRemoveRegistration (%d) ", address);
 	// send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
 	sendData(address, 0x0, 0x02, 0, nullptr);
 }
 void SamilCommunicator::sendReset()
 {
 	if (debugMode)
-		LOGGER.print ("sendReset(): ");
+		LOGGER.print("sendReset(): ");
 	// send out the remove address to the inverter. If the inverter is still connected it will reconnect after discovery
-	sendData(0x01, 0x00, 0x02, 0x00, nullptr);
-	sendData(0x00, 0x00, 0x04, 0x00, nullptr);
+	sendData(0x01, 0x00, 0x02, 0x00, nullptr, 2000);
+	sendData(0x00, 0x00, 0x04, 0x00, nullptr, 2000);
 }
 
 void SamilCommunicator::handle()
 {
 	// always check for incoming data
 	checkIncomingData();
-	if (txdelay > 0) {
-		if (millis()>=(lastrxtime+txdelay) ) {
+	if (txPacket.active)
+	{
+		if (millis() >= (lastrxtime + txPacket.txdelay))
+		{
 			LOGGER.println("Dealing with delayed send");
-			txdelay=0;
+			txPacket.active = false;
 			doSend();
 		}
 	}
 
-#ifdef NOTDEF
 	// check for offline inverters
 	checkOfflineInverters();
+
+#ifdef NOTDEF
 
 	// discovery every 10 secs.
 	if (millis() - lastDiscoverySent >= DISCOVERY_INTERVAL)
@@ -599,14 +628,15 @@ void SamilCommunicator::handle()
 		lastDiscoverySent = millis();
 	}
 
-	// ask for info update every second
-	if (millis() - lastInfoUpdateSent >= 1000)
+#endif
+
+	// ask for info update every 5 second
+	if (millis() - lastInfoUpdateSent >= 5000)
 	{
 		LOGGER.println("Would normall ask inverters for info");
-		//askAllInvertersForInformation();
+		askAllInvertersForInformation();
 		lastInfoUpdateSent = millis();
 	}
-#endif
 
 	checkIncomingData();
 }

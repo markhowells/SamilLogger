@@ -23,7 +23,6 @@
 
 
 SettingsManager settingsManager;
-TXPacket txPacket;
 SamilCommunicator samilComms(&settingsManager, true);
 MQTTPublisher mqqtPublisher(&settingsManager, &samilComms, true);
 HAPublisher haPublisher(&settingsManager);
